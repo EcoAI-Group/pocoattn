@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="PoCoAttn: Position–Content Collaborative Sparse Attention for Fast and High-Fidelity Video Generation">
+<title>PoCoAttn</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Libre+Franklin:wght@400;600;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+/* Layout: sticky lab bar -> black hero over two drifting rows of PoCoAttn clips from every model (LTX first) ->
+   gold band: Pareto sketch + claim + DiT speedups -> white abstract and method ->
+   black clip gallery with a sticky model nav -> citation. One fixed look: Purdue black with Boilermaker / aged gold. */
+:root{
+  color-scheme:light;
+  --black:#000000; --coal:#0b0a08; --panel:#17150f; --hair:rgba(255,255,255,.16);
+  --gold:#cfb991; --aged:#8e6f3e; --rush:#daaa00;
+  --paper:#ffffff; --paper-2:#f3f0e8; --line:#d8d2c3; --ink:#12110e; --muted:#5d584d;
+  --white:#ffffff;
+  --display:"Barlow Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --sans:"Libre Franklin","Helvetica Neue",Helvetica,Arial,sans-serif;
+  --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+  --bar:62px;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:17px;line-height:1.55;overflow-x:clip}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--black)}
+a{color:inherit;text-decoration:none}
+img,video{display:block;max-width:100%}
+.wrap{width:100%;max-width:1360px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+@media (min-width:900px){.wrap{padding-left:max(40px,env(safe-area-inset-left,0px));padding-right:max(40px,env(safe-area-inset-right,0px))}}
+:focus-visible{outline:2px solid var(--rush);outline-offset:3px}
+h2{margin:0;font-family:var(--display);font-weight:700;font-size:clamp(36px,4.2vw,56px);line-height:1;letter-spacing:.01em;text-transform:uppercase;text-wrap:balance}
+.eyebrow{margin:0 0 12px;color:var(--aged);font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+[id]{scroll-margin-top:calc(var(--bar) + 20px)}
+
+/* ---------- lab bar ---------- */
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--black);color:var(--white);border-bottom:1px solid var(--hair)}
+.topbar .wrap{display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:var(--bar)}
+.brand{display:flex;align-items:center;gap:18px;min-width:0}
+.lab{display:flex;align-items:center;gap:10px;min-width:0;white-space:nowrap}
+.lab+.lab{padding-left:18px;border-left:1px solid var(--hair)}
+.lab-logo{flex:none;width:auto;height:34px}
+.seal{flex:none;width:48px;height:48px}
+.lab b{color:var(--gold);line-height:1;font-family:var(--display);font-size:21px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+.lab span{color:var(--white);font-size:14px;font-weight:600;line-height:1;overflow:hidden;text-overflow:ellipsis}
+.topnav{display:flex;gap:26px;font-size:12px;font-weight:800;letter-spacing:.07em;text-transform:uppercase}
+.topnav a{color:rgba(255,255,255,.72)}
+.topnav a:hover{color:var(--gold)}
+@media (max-width:760px){.topnav{display:none}}
+
+/* ---------- hero ---------- */
+.hero{position:relative;overflow:hidden;background:var(--black);color:var(--white)}
+.hero-reel{position:absolute;inset:14px auto 14px 0;display:flex;gap:14px;width:max-content;pointer-events:none;animation:reel 170s linear infinite}
+.reel-set{flex:none;display:flex;flex-direction:column;gap:14px;height:100%}
+.reel-row{flex:1;display:flex;gap:14px;min-height:0}
+.reel-row+.reel-row{transform:translateX(calc(((100% - (var(--n) - 1) * 14px) / var(--n) + 14px) / -2))}  /* lower row sits half a card to the left, brick-style */
+.reel-card{position:relative;flex:none;height:100%;aspect-ratio:16/9;overflow:hidden;background:var(--panel)}
+.reel-card video{width:100%;height:100%;object-fit:cover}
+.hero-shade{position:absolute;inset:0;background:linear-gradient(90deg,#000 0%,rgba(0,0,0,.96) 44%,rgba(0,0,0,.45) 66%,rgba(0,0,0,.1) 100%)}
+.hero-main{position:relative;z-index:2;display:flex;flex-direction:column;justify-content:center;min-height:clamp(520px,46vw,640px);padding-block:clamp(48px,6vw,84px)}
+.hero-main>div{max-width:680px}
+.hero h1{margin:0;font-family:var(--display);font-weight:700;font-size:clamp(64px,9vw,128px);line-height:.86;letter-spacing:-.005em}
+.hero h1 i{color:var(--gold);font-style:normal}
+.hero-title{max-width:24em;margin:22px 0 0;font-family:var(--serif);font-size:clamp(20px,2vw,28px);line-height:1.22;text-wrap:balance}
+.authors{display:flex;flex-wrap:wrap;gap:4px 20px;margin:30px 0 0;padding:0;list-style:none;font-size:15px;font-weight:600}
+.authors a{border-bottom:1px solid var(--gold)}
+.authors a:hover{color:var(--gold)}
+.authors sup,.affils sup{margin-left:2px;color:var(--gold);font-size:.7em;font-weight:800}
+.affils{display:flex;flex-wrap:wrap;gap:2px 10px;margin:10px 0 0;color:rgba(255,255,255,.66);font-size:13px}
+.affils sup{margin:0 3px 0 0}
+.affils span+span::before{content:"·";margin-right:10px;color:rgba(255,255,255,.4)}
+.affils a{color:var(--gold);border-bottom:1px solid rgba(207,185,145,.5)}
+.affils a:hover{color:var(--white)}
+a.lab:hover b{color:var(--white)}
+@media (max-width:520px){.lab span{display:none}.lab+.lab{padding-left:14px}.brand{gap:14px}}
+.flag{padding:1px 7px;border:1px dashed var(--rush);color:var(--rush);font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:30px}
+.button{display:inline-flex;justify-content:center;align-items:center;min-width:132px;min-height:44px;padding:0 22px;border:1px solid var(--gold);font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.button-solid{background:var(--gold);color:var(--black)}
+.button-solid:hover{background:var(--white);border-color:var(--white)}
+.button-line:hover{background:rgba(207,185,145,.18)}
+.button[aria-disabled="true"]{border-style:dashed;border-color:rgba(255,255,255,.4);background:transparent;color:rgba(255,255,255,.6);cursor:default}
+
+/* stacked clip: Dense over PoCoAttn (inputs on top for I2V / editing) */
+.stack{position:relative;overflow:hidden;background:var(--panel)}
+.stack video{width:100%;height:100%;object-fit:cover}
+.stack-2{aspect-ratio:8/9}
+.stack-3{aspect-ratio:16/27}
+.tag{position:absolute;left:0;z-index:2;padding:6px 10px;background:rgba(0,0,0,.78);color:var(--white);font-size:10px;font-weight:800;letter-spacing:.08em;line-height:1;text-transform:uppercase}
+.tag-ours{background:var(--gold);color:var(--black)}
+.tag-src{color:rgba(255,255,255,.75)}
+
+/* ---------- speedup band ---------- */
+.band{background:var(--gold);color:var(--black)}
+.band .wrap{display:grid;grid-template-columns:minmax(0,304px) minmax(0,1fr);align-items:stretch;gap:28px clamp(28px,4vw,60px);padding-block:34px 36px}
+.pareto{position:relative;display:flex;flex-direction:column;justify-content:center;margin:0;padding:9px 12px;border-radius:12px;background:var(--white);box-shadow:0 12px 28px rgba(60,42,8,.22),0 2px 6px rgba(60,42,8,.12)}
+.pareto>svg{display:block;width:100%;height:auto}
+.pareto text{font-family:var(--sans);font-variant-numeric:tabular-nums}
+.pareto .pt{outline:none;cursor:default}
+.pareto .pt:hover .mk,.pareto .pt:focus-visible .mk{stroke:var(--ink);stroke-width:2.4}
+.pareto-key{display:grid;grid-template-columns:repeat(3,max-content);gap:1px 12px;margin:4px 0 0;padding:0;list-style:none;color:var(--ink);font-size:10.5px;font-weight:600;line-height:1.35}
+.pareto-key li{display:flex;align-items:center;gap:5px}
+.pareto-key svg{width:12px;height:12px}
+.pareto-tip{position:absolute;z-index:3;display:grid;gap:1px;padding:7px 10px;border-radius:6px;background:var(--ink);color:var(--white);font-size:11.5px;line-height:1.35;white-space:nowrap;pointer-events:none;transform:translate(-50%,calc(-100% - 12px))}
+.pareto-tip b{font-size:12.5px;font-variant-numeric:tabular-nums}
+.pareto-tip span,.pareto-tip i{color:rgba(255,255,255,.75);font-style:normal}
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+.band-main{align-self:center;min-width:0}
+.band-claim{max-width:30em;margin:0 0 24px;font-family:var(--serif);font-size:clamp(22px,2.3vw,31px);line-height:1.18;text-wrap:balance}
+.band-title{margin:0 0 14px;font-size:11px;font-weight:400;letter-spacing:.1em;text-transform:uppercase}
+.band-title b{font-weight:800}
+.stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:22px 0;margin:0}
+.stat{min-width:0;padding:0 12px;border-left:1px solid rgba(0,0,0,.28)}
+.stat dd{margin:0;font-family:var(--display);font-weight:700;font-size:clamp(36px,3.6vw,52px);line-height:.9;font-variant-numeric:tabular-nums}
+.stat dt{margin-top:10px;font-size:13px;font-weight:800;line-height:1.25}
+.stat dt span{display:block;font-weight:400;font-size:12px;color:rgba(0,0,0,.66)}
+@media (max-width:1100px){.band .wrap{grid-template-columns:minmax(0,1fr)}.pareto{max-width:304px}}
+@media (max-width:760px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* ---------- abstract + method ---------- */
+.abstract .wrap{padding-block:clamp(64px,8vw,104px)}
+.abstract-col{max-width:880px}
+.abstract-col p{margin:0;color:#3f3b33;font-family:var(--serif);font-size:clamp(18px,1.45vw,21px);line-height:1.62}
+.abstract-col h2{margin-bottom:26px}
+.abstract-col p+p{margin-top:20px}
+.abstract-col strong{color:var(--ink);font-weight:600}
+.method{background:var(--paper-2);border-block:1px solid var(--line)}
+.method .wrap{display:grid;gap:40px;padding-block:clamp(64px,8vw,104px)}
+.ideas{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:28px 44px;margin:0;padding:0;list-style:none;counter-reset:idea}
+.ideas li{position:relative;min-width:0;padding-left:54px;counter-increment:idea}
+.ideas li::before{content:counter(idea);position:absolute;left:0;top:-6px;color:var(--aged);font-family:var(--display);font-weight:700;font-size:52px;line-height:1}
+.ideas h3{margin:0 0 8px;font-size:16px;font-weight:800;line-height:1.3}
+.ideas p{margin:0;color:var(--muted);font-family:var(--serif);font-size:16px;line-height:1.55}
+.method-figure{margin:0;padding:clamp(12px,2vw,28px);border-radius:clamp(18px,2.4vw,32px);background:var(--white);box-shadow:0 12px 28px rgba(60,42,8,.16),0 2px 6px rgba(60,42,8,.1);overflow-x:auto}
+.method-figure img{width:100%;min-width:640px}
+
+/* ---------- gallery ---------- */
+.gallery{background:var(--coal);color:var(--white);padding-block:clamp(64px,8vw,96px) clamp(72px,8vw,104px)}
+.gallery .eyebrow{color:var(--gold)}
+.gallery-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:14px 40px}
+.gallery-head>p{max-width:38ch;margin:0;color:rgba(255,255,255,.6);font-size:15px}
+.model-nav{position:sticky;top:calc(var(--bar) + env(safe-area-inset-top,0px));z-index:10;margin-top:30px;background:var(--coal);border-block:1px solid var(--hair)}
+.model-nav .wrap{display:flex;gap:6px 26px;overflow-x:auto;padding-block:12px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.model-nav a{color:rgba(255,255,255,.66)}
+.model-nav a:hover{color:var(--gold)}
+.model{padding-top:56px;scroll-margin-top:calc(var(--bar) + 60px)}
+.model+.model{margin-top:64px;border-top:1px solid var(--hair)}
+.model-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:10px 32px;margin-bottom:22px}
+.model-head h3{margin:0;font-size:clamp(24px,2.5vw,32px);font-weight:800;line-height:1.05;letter-spacing:-.01em}
+.model-head p{margin:6px 0 0;color:rgba(255,255,255,.55);font-size:13px}
+.speed{display:flex;align-items:baseline;gap:12px;margin:0}
+.speed b{color:var(--gold);font-family:var(--display);font-weight:700;font-size:clamp(40px,4vw,54px);line-height:.9;font-variant-numeric:tabular-nums}
+.speed span{font-size:12px;font-weight:800;letter-spacing:.07em;text-transform:uppercase}
+.speed span small{display:block;color:rgba(255,255,255,.55);font-size:11px;font-weight:400;letter-spacing:.02em;text-transform:none}
+.clips{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:30px 14px}
+.clip{min-width:0;margin:0}
+.clip figcaption{margin-top:12px;padding-right:8px}
+.prompt,.clip summary .preview,.prompt-full{margin:0;color:rgba(255,255,255,.62);font-family:var(--serif);font-size:13.5px;line-height:1.5}
+.clip details summary{cursor:pointer;list-style:none}
+.clip details summary::-webkit-details-marker{display:none}
+.clip summary .preview{display:block}
+.toggle{display:block;width:fit-content;margin-top:6px;color:var(--gold);font-family:var(--sans);font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.toggle .less,details[open] .toggle .more{display:none}
+details[open] .toggle .less{display:inline}
+.prompt-full{margin-top:8px;color:rgba(255,255,255,.72)}
+.kind{margin-right:8px;color:var(--gold);font-family:var(--sans);font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.gallery-note{margin:40px 0 0;color:rgba(255,255,255,.5);font-size:12px}
+
+/* ---------- citation ---------- */
+.cite{background:var(--paper-2);border-top:1px solid var(--line)}
+.cite .wrap{padding-block:clamp(56px,7vw,88px)}
+.bibtex{max-width:920px;margin-top:26px;border:1px solid var(--line);background:var(--white)}
+.bibtex-bar{display:flex;justify-content:space-between;align-items:center;min-height:48px;padding:0 8px 0 18px;border-bottom:1px solid var(--line);color:var(--muted);font-size:12px;font-weight:800;letter-spacing:.07em;text-transform:uppercase}
+.bibtex-bar button{min-height:32px;padding:0 16px;border:0;background:var(--ink);color:var(--white);font:inherit;font-size:12px;font-weight:800;letter-spacing:0;text-transform:none;cursor:pointer}
+.bibtex-bar button:hover{background:var(--aged)}
+.bibtex pre{margin:0;padding:clamp(18px,2.4vw,30px);color:#33302a;font:13px/1.7 var(--mono);overflow-x:auto}
+.foot{background:var(--black);color:rgba(255,255,255,.6);font-size:12px}
+.foot .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 24px;padding-block:22px}
+.foot b{color:var(--gold)}
+.foot a:hover{color:var(--gold)}
+
+@keyframes reel{to{transform:translateX(calc(-50% - 7px))}}
+@media (max-width:900px){.hero-shade{background:linear-gradient(90deg,rgba(0,0,0,.95),rgba(0,0,0,.72))}}
+@media (max-width:760px){
+  body{font-size:16px}
+  .clips{grid-template-columns:minmax(0,1fr)}
+  .stat{padding:0 12px}
+  .bibtex pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px}
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.hero-reel{animation:none}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="wrap">
+    <div class="brand"><div class="lab"><img class="seal" src="media/purdue_seal.png" width="48" height="48" alt="Purdue University seal"><span>Purdue University</span></div><a class="lab" href="https://ecoai-group.github.io/" target="_blank" rel="noopener"><img class="lab-logo" src="media/ecoai_logo.png" width="47" height="34" alt="EcoAI Lab logo"><b>EcoAI Lab</b></a></div>
+    <nav class="topnav" aria-label="Sections">
+      <a href="#abstract">Abstract</a><a href="#method">Method</a><a href="#videos">Videos</a><a href="#cite">BibTeX</a>
+    </nav>
+  </div>
+</div>
+
+<header class="hero" id="top">
+  <div class="hero-reel" aria-hidden="true">
+    <div class="reel-set" style="--n:9"><div class="reel-row"><div class="reel-card"><video src="media/hero/bernini_80.mp4" poster="media/hero/bernini_80.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">Bernini</span></div><div class="reel-card"><video src="media/hero/ltx_s2.mp4" poster="media/hero/ltx_s2.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">LTX-2.3-22B</span></div><div class="reel-card"><video src="media/hero/ltx_s8.mp4" poster="media/hero/ltx_s8.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">LTX-2.3-22B</span></div><div class="reel-card"><video src="media/hero/ltx_s4.mp4" poster="media/hero/ltx_s4.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">LTX-2.3-22B</span></div><div class="reel-card"><video src="media/hero/wan_t2v_338.mp4" poster="media/hero/wan_t2v_338.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">Wan2.1-T2V-14B</span></div><div class="reel-card"><video src="media/hero/wan_t2v_142.mp4" poster="media/hero/wan_t2v_142.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">Wan2.1-T2V-14B</span></div><div class="reel-card"><video src="media/hero/wan_i2v_135.mp4" poster="media/hero/wan_i2v_135.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">Wan2.1-I2V-14B</span></div><div class="reel-card"><video src="media/hero/hunyuan_288.mp4" poster="media/hero/hunyuan_288.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">HunyuanVideo-13B</span></div><div class="reel-card"><video src="media/hero/hunyuan_310.mp4" poster="media/hero/hunyuan_310.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">HunyuanVideo-13B</span></div></div><div class="reel-row"><div class="reel-card"><video src="media/hero/bernini_123.mp4" poster="media/hero/bernini_123.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">Bernini</span></div><div class="reel-card"><video src="media/hero/ltx_s5.mp4" poster="media/hero/ltx_s5.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">LTX-2.3-22B</span></div><div class="reel-card"><video src="media/hero/ltx_s1.mp4" poster="media/hero/ltx_s1.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">LTX-2.3-22B</span></div><div class="reel-card"><video src="media/hero/ltx_s7.mp4" poster="media/hero/ltx_s7.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">LTX-2.3-22B</span></div><div class="reel-card"><video src="media/hero/wan_t2v_244.mp4" poster="media/hero/wan_t2v_244.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">Wan2.1-T2V-14B</span></div><div class="reel-card"><video src="media/hero/wan_i2v_12.mp4" poster="media/hero/wan_i2v_12.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">Wan2.1-I2V-14B</span></div><div class="reel-card"><video src="media/hero/wan_i2v_287.mp4" poster="media/hero/wan_i2v_287.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">Wan2.1-I2V-14B</span></div><div class="reel-card"><video src="media/hero/hunyuan_362.mp4" poster="media/hero/hunyuan_362.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">HunyuanVideo-13B</span></div><div class="reel-card"><video src="media/hero/bernini_4.mp4" poster="media/hero/bernini_4.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">Bernini</span></div></div></div>
+    <div class="reel-set" style="--n:9"><div class="reel-row"><div class="reel-card"><video src="media/hero/bernini_80.mp4" poster="media/hero/bernini_80.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">Bernini</span></div><div class="reel-card"><video src="media/hero/ltx_s2.mp4" poster="media/hero/ltx_s2.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">LTX-2.3-22B</span></div><div class="reel-card"><video src="media/hero/ltx_s8.mp4" poster="media/hero/ltx_s8.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">LTX-2.3-22B</span></div><div class="reel-card"><video src="media/hero/ltx_s4.mp4" poster="media/hero/ltx_s4.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">LTX-2.3-22B</span></div><div class="reel-card"><video src="media/hero/wan_t2v_338.mp4" poster="media/hero/wan_t2v_338.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">Wan2.1-T2V-14B</span></div><div class="reel-card"><video src="media/hero/wan_t2v_142.mp4" poster="media/hero/wan_t2v_142.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">Wan2.1-T2V-14B</span></div><div class="reel-card"><video src="media/hero/wan_i2v_135.mp4" poster="media/hero/wan_i2v_135.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">Wan2.1-I2V-14B</span></div><div class="reel-card"><video src="media/hero/hunyuan_288.mp4" poster="media/hero/hunyuan_288.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">HunyuanVideo-13B</span></div><div class="reel-card"><video src="media/hero/hunyuan_310.mp4" poster="media/hero/hunyuan_310.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">HunyuanVideo-13B</span></div></div><div class="reel-row"><div class="reel-card"><video src="media/hero/bernini_123.mp4" poster="media/hero/bernini_123.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">Bernini</span></div><div class="reel-card"><video src="media/hero/ltx_s5.mp4" poster="media/hero/ltx_s5.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">LTX-2.3-22B</span></div><div class="reel-card"><video src="media/hero/ltx_s1.mp4" poster="media/hero/ltx_s1.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">LTX-2.3-22B</span></div><div class="reel-card"><video src="media/hero/ltx_s7.mp4" poster="media/hero/ltx_s7.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">LTX-2.3-22B</span></div><div class="reel-card"><video src="media/hero/wan_t2v_244.mp4" poster="media/hero/wan_t2v_244.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">Wan2.1-T2V-14B</span></div><div class="reel-card"><video src="media/hero/wan_i2v_12.mp4" poster="media/hero/wan_i2v_12.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">Wan2.1-I2V-14B</span></div><div class="reel-card"><video src="media/hero/wan_i2v_287.mp4" poster="media/hero/wan_i2v_287.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">Wan2.1-I2V-14B</span></div><div class="reel-card"><video src="media/hero/hunyuan_362.mp4" poster="media/hero/hunyuan_362.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">HunyuanVideo-13B</span></div><div class="reel-card"><video src="media/hero/bernini_4.mp4" poster="media/hero/bernini_4.jpg" muted loop playsinline preload="metadata"></video><span class="tag tag-ours" style="top:0">Bernini</span></div></div></div>
+  </div>
+  <div class="hero-shade"></div>
+  <div class="wrap hero-main">
+    <div>
+      <h1><i>PoCo</i>Attn</h1>
+      <p class="hero-title">Position–Content Collaborative Sparse Attention for Fast and High-Fidelity Video Generation</p>
+      <ul class="authors">
+        <li>Jianwen Wu</li>
+        <li>Meiling Wang</li>
+        <li>Junkang Zhou</li>
+        <li>Yipeng Shen</li>
+        <li>Haoran You</li>
+      </ul>
+      <p class="affils"><span>Purdue University</span><span><a href="https://ecoai-group.github.io/" target="_blank" rel="noopener">EcoAI Lab</a></span></p>
+      <div class="actions">
+        <a class="button button-solid" aria-disabled="true">Paper · soon</a>
+        <a class="button button-line" aria-disabled="true">Code · soon</a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section class="band" aria-label="Speed and fidelity">
+  <div class="wrap">
+    <figure class="pareto" id="pareto">
+      <svg viewBox="0 0 306 170" role="img" aria-label="PSNR against DiT speedup on Wan2.1-T2V-14B 720p: the PoCoAttn curve lies above every baseline."><path d="M34 98.0H292" stroke="#e9e5db" stroke-width="1"/><path d="M34 58.0H292" stroke="#e9e5db" stroke-width="1"/><path d="M34 18.0H292" stroke="#e9e5db" stroke-width="1"/><text x="27" y="141.6" font-size="10.5" text-anchor="end" fill="#6f727b">22</text><text x="27" y="101.6" font-size="10.5" text-anchor="end" fill="#6f727b">24</text><text x="27" y="61.6" font-size="10.5" text-anchor="end" fill="#6f727b">26</text><text x="27" y="21.6" font-size="10.5" text-anchor="end" fill="#6f727b">28</text><text x="85.6" y="152" font-size="10.5" text-anchor="middle" fill="#6f727b">1.2×</text><text x="154.4" y="152" font-size="10.5" text-anchor="middle" fill="#6f727b">1.4×</text><text x="223.2" y="152" font-size="10.5" text-anchor="middle" fill="#6f727b">1.6×</text><text x="292.0" y="152" font-size="10.5" text-anchor="middle" fill="#6f727b">1.8×</text><polyline fill="none" stroke="#9467bd" stroke-opacity=".9" stroke-width="1.3" stroke-dasharray="4.500 3" stroke-linecap="round" stroke-linejoin="round" points="123.4,95.6 144.1,104.6 233.5,122.2"/><polyline fill="none" stroke="#2ca02c" stroke-opacity=".9" stroke-width="1.3" stroke-dasharray="4.500 3" stroke-linecap="round" stroke-linejoin="round" points="82.2,89.6 113.1,98.8 188.8,117.4"/><polyline fill="none" stroke="#8c564b" stroke-opacity=".9" stroke-width="1.3" stroke-dasharray="4.500 3" stroke-linecap="round" stroke-linejoin="round" points="47.8,92.4 99.4,96.0"/><polyline fill="none" stroke="#7f7f7f" stroke-opacity=".9" stroke-width="1.3" stroke-dasharray="4.500 3" stroke-linecap="round" stroke-linejoin="round" points="54.6,106.0 82.2,113.0 137.2,129.8"/><polyline fill="none" stroke="#17becf" stroke-opacity=".9" stroke-width="1.3" stroke-dasharray="4.500 3" stroke-linecap="round" stroke-linejoin="round" points="47.8,104.2 120.0,128.0"/><path d="M233.5 76.6H258.9" stroke="#d62728" stroke-width="1.1" stroke-dasharray="1.5 3.500" stroke-linecap="round"/><path d="M233.5 114.2V78.6M230.0 83.6L233.5 78.6L237.0 83.6" fill="none" stroke="#d62728" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><text x="226.5" y="103.4" font-size="11" font-weight="800" text-anchor="end" fill="#b01f20">+2.3 dB</text><g class="pt" tabindex="0" data-n="Sol-Attn" data-d="33.8% density" data-v="1.31× · 24.12 dB"><polygon class="mk" fill="#fff" stroke="#9467bd" stroke-width="1.5" stroke-linejoin="round" points="123.4,91.5 119.8,98.3 127.0,98.3"/><circle cx="123.4" cy="95.6" r="10" fill="transparent"/></g><g class="pt" tabindex="0" data-n="Sol-Attn" data-d="24.7% density" data-v="1.37× · 23.67 dB"><polygon class="mk" fill="#fff" stroke="#9467bd" stroke-width="1.5" stroke-linejoin="round" points="144.1,100.5 140.5,107.3 147.7,107.3"/><circle cx="144.1" cy="104.6" r="10" fill="transparent"/></g><g class="pt" tabindex="0" data-n="Sol-Attn" data-d="14.9% density" data-v="1.63× · 22.79 dB"><polygon class="mk" fill="#fff" stroke="#9467bd" stroke-width="1.5" stroke-linejoin="round" points="233.5,118.1 229.9,124.9 237.1,124.9"/><circle cx="233.5" cy="122.2" r="10" fill="transparent"/></g><g class="pt" tabindex="0" data-n="PISA" data-d="30% density" data-v="1.19× · 24.42 dB"><polygon class="mk" fill="#fff" stroke="#2ca02c" stroke-width="1.5" stroke-linejoin="round" points="82.2,85.1 85.9,89.6 82.2,94.1 78.4,89.6"/><circle cx="82.2" cy="89.6" r="10" fill="transparent"/></g><g class="pt" tabindex="0" data-n="PISA" data-d="25% density" data-v="1.28× · 23.96 dB"><polygon class="mk" fill="#fff" stroke="#2ca02c" stroke-width="1.5" stroke-linejoin="round" points="113.1,94.3 116.9,98.8 113.1,103.3 109.3,98.8"/><circle cx="113.1" cy="98.8" r="10" fill="transparent"/></g><g class="pt" tabindex="0" data-n="PISA" data-d="15% density" data-v="1.50× · 23.03 dB"><polygon class="mk" fill="#fff" stroke="#2ca02c" stroke-width="1.5" stroke-linejoin="round" points="188.8,112.9 192.6,117.4 188.8,121.9 185.0,117.4"/><circle cx="188.8" cy="117.4" r="10" fill="transparent"/></g><g class="pt" tabindex="0" data-n="SVG-EAR" data-d="27% density" data-v="1.09× · 24.28 dB"><polygon class="mk" fill="#fff" stroke="#8c564b" stroke-width="1.5" stroke-linejoin="round" points="47.8,96.5 44.2,89.7 51.4,89.7"/><circle cx="47.8" cy="92.4" r="10" fill="transparent"/></g><g class="pt" tabindex="0" data-n="SVG-EAR" data-d="14.4% density" data-v="1.24× · 24.10 dB"><polygon class="mk" fill="#fff" stroke="#8c564b" stroke-width="1.5" stroke-linejoin="round" points="99.4,100.1 95.8,93.3 103.0,93.3"/><circle cx="99.4" cy="96.0" r="10" fill="transparent"/></g><g class="pt" tabindex="0" data-n="SVG2" data-d="31.2% density" data-v="1.11× · 23.60 dB"><rect class="mk" fill="#fff" stroke="#7f7f7f" stroke-width="1.5" stroke-linejoin="round" x="51.4" y="102.8" width="6.5" height="6.5"/><circle cx="54.6" cy="106.0" r="10" fill="transparent"/></g><g class="pt" tabindex="0" data-n="SVG2" data-d="23.9% density" data-v="1.19× · 23.25 dB"><rect class="mk" fill="#fff" stroke="#7f7f7f" stroke-width="1.5" stroke-linejoin="round" x="78.9" y="109.8" width="6.5" height="6.5"/><circle cx="82.2" cy="113.0" r="10" fill="transparent"/></g><g class="pt" tabindex="0" data-n="SVG2" data-d="14.3% density" data-v="1.35× · 22.41 dB"><rect class="mk" fill="#fff" stroke="#7f7f7f" stroke-width="1.5" stroke-linejoin="round" x="134.0" y="126.6" width="6.5" height="6.5"/><circle cx="137.2" cy="129.8" r="10" fill="transparent"/></g><g class="pt" tabindex="0" data-n="RadialAttn" data-d="39.8% density" data-v="1.09× · 23.69 dB"><polygon class="mk" fill="#fff" stroke="#17becf" stroke-width="1.5" stroke-linejoin="round" points="47.8,100.2 51.6,103.0 50.1,107.5 45.4,107.5 43.9,103.0"/><circle cx="47.8" cy="104.2" r="10" fill="transparent"/></g><g class="pt" tabindex="0" data-n="RadialAttn" data-d="26.4% density" data-v="1.30× · 22.50 dB"><polygon class="mk" fill="#fff" stroke="#17becf" stroke-width="1.5" stroke-linejoin="round" points="120.0,124.0 123.8,126.8 122.4,131.3 117.6,131.3 116.2,126.8"/><circle cx="120.0" cy="128.0" r="10" fill="transparent"/></g><polyline fill="none" stroke="#d62728" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" points="154.4,21.8 219.8,50.8 267.9,76.6"/><g class="pt" tabindex="0" data-n="PoCoAttn" data-d="25% density" data-v="1.40× · 27.81 dB"><polygon class="mk" fill="#d62728" stroke="#fff" stroke-width="1" stroke-linejoin="round" points="154.4,14.2 156.3,19.2 161.6,19.5 157.4,22.8 158.9,27.9 154.4,25.0 149.9,27.9 151.4,22.8 147.2,19.5 152.5,19.2"/><circle cx="154.4" cy="21.8" r="10" fill="transparent"/></g><g class="pt" tabindex="0" data-n="PoCoAttn" data-d="15% density" data-v="1.59× · 26.36 dB"><polygon class="mk" fill="#d62728" stroke="#fff" stroke-width="1" stroke-linejoin="round" points="219.8,43.2 221.6,48.2 227.0,48.5 222.8,51.8 224.2,56.9 219.8,54.0 215.3,56.9 216.7,51.8 212.5,48.5 217.9,48.2"/><circle cx="219.8" cy="50.8" r="10" fill="transparent"/></g><text x="229.8" y="45.8" font-size="12" font-weight="800" fill="#b01f20">PoCoAttn</text><g class="pt" tabindex="0" data-n="PoCoAttn" data-d="10% density" data-v="1.73× · 25.07 dB"><polygon class="mk" fill="#d62728" stroke="#fff" stroke-width="1" stroke-linejoin="round" points="267.9,69.0 269.8,74.0 275.1,74.3 271.0,77.6 272.4,82.7 267.9,79.8 263.5,82.7 264.9,77.6 260.7,74.3 266.0,74.0"/><circle cx="267.9" cy="76.6" r="10" fill="transparent"/></g><g transform="translate(118.3 65.6) rotate(-30)" opacity=".4"><polygon points="0,-2.6 22,-2.6 22,-7 33,0 22,7 22,2.6 0,2.6" fill="#7d786e" stroke="#7d786e" stroke-width="1.6" stroke-linejoin="round"/><text x="12.0" y="-9.5" font-size="11" font-weight="800" text-anchor="middle" fill="#5d584d">Better</text></g><path d="M34 4V132Q34 138 40 138H302" fill="none" stroke="#12110e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><text x="41" y="11" font-size="11" font-weight="800" fill="#12110e">PSNR (dB)</text><text x="300" y="167" font-size="11" font-weight="800" text-anchor="end" fill="#12110e">DiT speedup</text><text x="300" y="11" font-size="10.5" font-weight="600" text-anchor="end" fill="#6f727b">Wan2.1-T2V-14B 720p</text></svg>
+      <ul class="pareto-key"><li><svg viewBox="0 0 14 14" aria-hidden="true"><polygon class="" fill="#d62728" stroke="#fff" stroke-width="1" stroke-linejoin="round" points="7.0,0.4 8.6,4.8 13.3,5.0 9.6,7.9 10.9,12.3 7.0,9.8 3.1,12.3 4.4,7.9 0.7,5.0 5.4,4.8"/></svg>PoCoAttn</li><li><svg viewBox="0 0 14 14" aria-hidden="true"><polygon class="" fill="#fff" stroke="#9467bd" stroke-width="1.5" stroke-linejoin="round" points="7.0,2.5 3.1,9.9 10.9,9.9"/></svg>Sol-Attn</li><li><svg viewBox="0 0 14 14" aria-hidden="true"><polygon class="" fill="#fff" stroke="#2ca02c" stroke-width="1.5" stroke-linejoin="round" points="7.0,2.1 11.1,7.0 7.0,11.9 2.9,7.0"/></svg>PISA</li><li><svg viewBox="0 0 14 14" aria-hidden="true"><polygon class="" fill="#fff" stroke="#8c564b" stroke-width="1.5" stroke-linejoin="round" points="7.0,11.5 3.1,4.1 10.9,4.1"/></svg>SVG-EAR</li><li><svg viewBox="0 0 14 14" aria-hidden="true"><rect class="" fill="#fff" stroke="#7f7f7f" stroke-width="1.5" stroke-linejoin="round" x="3.5" y="3.5" width="7.0" height="7.0"/></svg>SVG2</li><li><svg viewBox="0 0 14 14" aria-hidden="true"><polygon class="" fill="#fff" stroke="#17becf" stroke-width="1.5" stroke-linejoin="round" points="7.0,2.6 11.2,5.7 9.6,10.5 4.4,10.5 2.8,5.7"/></svg>RadialAttn</li></ul>
+      <div class="pareto-tip" id="pareto-tip" hidden><b></b><span></span><i></i></div>
+      <div class="sr-only"><table><caption>PSNR and DiT speedup, Wan2.1-T2V-14B 720p, attention density in percent</caption><thead><tr><th>Method</th><th>Density</th><th>DiT speedup</th><th>PSNR (dB)</th></tr></thead><tbody><tr><td>PoCoAttn</td><td>25%</td><td>1.40×</td><td>27.81</td></tr><tr><td>PoCoAttn</td><td>15%</td><td>1.59×</td><td>26.36</td></tr><tr><td>PoCoAttn</td><td>10%</td><td>1.73×</td><td>25.07</td></tr><tr><td>Sol-Attn</td><td>33.8%</td><td>1.31×</td><td>24.12</td></tr><tr><td>Sol-Attn</td><td>24.7%</td><td>1.37×</td><td>23.67</td></tr><tr><td>Sol-Attn</td><td>14.9%</td><td>1.63×</td><td>22.79</td></tr><tr><td>PISA</td><td>30%</td><td>1.19×</td><td>24.42</td></tr><tr><td>PISA</td><td>25%</td><td>1.28×</td><td>23.96</td></tr><tr><td>PISA</td><td>15%</td><td>1.50×</td><td>23.03</td></tr><tr><td>SVG-EAR</td><td>27%</td><td>1.09×</td><td>24.28</td></tr><tr><td>SVG-EAR</td><td>14.4%</td><td>1.24×</td><td>24.10</td></tr><tr><td>SVG2</td><td>31.2%</td><td>1.11×</td><td>23.60</td></tr><tr><td>SVG2</td><td>23.9%</td><td>1.19×</td><td>23.25</td></tr><tr><td>SVG2</td><td>14.3%</td><td>1.35×</td><td>22.41</td></tr><tr><td>RadialAttn</td><td>39.8%</td><td>1.09×</td><td>23.69</td></tr><tr><td>RadialAttn</td><td>26.4%</td><td>1.30×</td><td>22.50</td></tr></tbody></table></div>
+    </figure>
+    <div class="band-main">
+      <p class="band-claim">PoCoAttn achieves a better speed–fidelity Pareto frontier than existing sparse attention methods.</p>
+      <p class="band-title">DiT speedup at 15% attention density, over <b>FlashAttention-3 dense attention</b></p>
+      <dl class="stats">
+        <div class="stat"><dd>2.02×</dd><dt>LTX-2.3-22B<span>1080p text-to-video</span></dt></div>
+        <div class="stat"><dd>1.59×</dd><dt>Wan2.1-T2V-14B<span>720p text-to-video</span></dt></div>
+        <div class="stat"><dd>1.60×</dd><dt>Wan2.1-I2V-14B<span>720p image-to-video</span></dt></div>
+        <div class="stat"><dd>1.79×</dd><dt>HunyuanVideo-13B<span>720p text-to-video</span></dt></div>
+        <div class="stat"><dd>1.72×</dd><dt>Bernini<span>720p video editing</span></dt></div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<main>
+<section class="abstract" id="abstract">
+  <div class="wrap">
+    <div class="abstract-col">
+      <h2>Abstract</h2>
+      <p>Video diffusion transformers rely on 3D full attention over tens of thousands of spatiotemporal tokens, and its quadratic cost dominates inference latency. Sparse attention reduces this cost, but existing methods face a dilemma: static methods apply predefined masks and cannot capture input-dependent attention, whereas dynamic methods reconstruct the sparse mask repeatedly, paying online to rediscover positional structure that is largely stable across inputs.</p>
+      <p>We propose <strong>PoCoAttn</strong>, a training-free sparse attention framework that separates input-stable from input-dependent attention and resolves the former offline and the latter online. Across four video diffusion models and three tasks, PoCoAttn consistently achieves a better speed–fidelity Pareto frontier than state-of-the-art methods, improving PSNR by <strong>1 to 5 dB</strong> over baselines and delivering up to <strong>4.1× attention</strong> and <strong>2.0× DiT</strong> speedups over dense FlashAttention-3 attention.</p>
+    </div>
+  </div>
+</section>
+
+<section class="method" id="method">
+  <div class="wrap">
+    <div>
+      <p class="eyebrow">Method</p>
+      <h2>The Proposed PoCoAttn Framework</h2>
+    </div>
+    <ol class="ideas">
+      <li><h3>Attention Decomposition</h3><p>Characterized by the 3D relative offsets of query–key pairs, video attention splits into an input-stable positional prior and an input-dependent content residual.</p></li>
+      <li><h3>Position–Content Sparse Attention</h3><p>Each query tile looks up its positional key tiles in an offline-compiled table, selects content keys online by pooled-query scores, and merges the discarded keys into virtual keys by weighted pooling. The position–content ratio of each head is solved offline.</p></li>
+      <li><h3>Step-Adaptive Budget Allocation</h3><p>Early-step attention errors are larger and far more amplified along the denoising trajectory. The step-wise budget is solved offline by minimizing the local error weighted by its amplification, which front-loads the budget toward early steps.</p></li>
+    </ol>
+    <figure class="method-figure"><img src="media/fig_overview.png" alt="Overview of PoCoAttn: offline positional tables, online content key selection with compensation, and the step-adaptive budget." loading="lazy"></figure>
+  </div>
+</section>
+
+<section class="gallery" id="videos">
+  <div class="wrap gallery-head">
+    <div>
+      <p class="eyebrow">Same prompt, same seed</p>
+      <h2>Dense vs. PoCoAttn</h2>
+    </div>
+    <p>Each clip plays the dense-attention output on top and the PoCoAttn output below it.</p>
+  </div>
+  <nav class="model-nav" aria-label="Models">
+    <div class="wrap">
+      <a href="#ltx">LTX-2.3-22B</a>
+      <a href="#wan_t2v">Wan2.1-T2V-14B</a>
+      <a href="#wan_i2v">Wan2.1-I2V-14B</a>
+      <a href="#hunyuan">HunyuanVideo-13B</a>
+      <a href="#bernini">Bernini</a>
+    </div>
+  </nav>
+  <div class="wrap">
+    <div class="model" id="ltx">
+      <div class="model-head">
+        <div><h3>LTX-2.3-22B</h3><p>1080p text-to-video</p></div>
+        <p class="speed"><b>2.02×</b><span>DiT speedup<small>15% attention density</small></span></p>
+      </div>
+      <div class="clips">
+        <figure class="clip"><div class="stack stack-2"><video src="media/ltx/s2.mp4" poster="media/ltx/s2.jpg" muted loop playsinline preload="none"></video><span class="tag" style="top:0.000%">Dense</span><span class="tag tag-ours" style="top:50.000%">PoCoAttn</span></div><figcaption><details><summary><span class="preview">INT. CRYOGENIC BAY OF A DEEP-SPACE FREIGHTER - EMERGENCY LIGHTING</span><span class="toggle"><span class="more">Show full prompt</span><span class="less">Collapse prompt</span></span></summary><p class="prompt-full">INT. CRYOGENIC BAY OF A DEEP-SPACE FREIGHTER - EMERGENCY LIGHTING. A tight 85mm close-up on a cryopod window laced with frost. Behind the glass a woman with short dark hair lies with eyes closed, skin pale and dusted with ice crystals. The pod hisses, the frost melts into running droplets, and cool blue standby lights give way to warm amber as power returns. Her eyes open slowly and focus on the camera; she takes a sharp first breath that fogs the glass. Rows of identical dark pods blur into the background, one lamp blinking far away. Realistic, clean subject-background separation, strong cold-to-warm light transition, visible face, no helmet, no text, no cartoon styling. Audio: hydraulic hiss, dripping water, a low ship hum, one deep inhale.</p></details></figcaption></figure>
+        <figure class="clip"><div class="stack stack-2"><video src="media/ltx/s5.mp4" poster="media/ltx/s5.jpg" muted loop playsinline preload="none"></video><span class="tag" style="top:0.000%">Dense</span><span class="tag tag-ours" style="top:50.000%">PoCoAttn</span></div><figcaption><details><summary><span class="preview">EXT. SMALL FISHING HARBOR - DAWN, THIN FOG</span><span class="toggle"><span class="more">Show full prompt</span><span class="less">Collapse prompt</span></span></summary><p class="prompt-full">EXT. SMALL FISHING HARBOR - DAWN, THIN FOG. A bright 85mm close-up of an old fisherman with a weathered face, white stubble and a faded wool cap, mending a net on the deck of a wooden boat. Soft golden sunrise light breaks through the fog and travels slowly across his hands, then his face, as the boat rocks gently. He pauses, looks up toward the open sea, and squints with a faint smile. Masts, ropes and gulls blur into creamy bokeh behind him. The camera makes a slow eye-level push-in. Natural documentary realism, warm highlights, visible skin texture, gentle water reflections, no text, no logos. Audio: gulls, water lapping against the hull, creaking rope.</p></details></figcaption></figure>
+        <figure class="clip"><div class="stack stack-2"><video src="media/ltx/s8.mp4" poster="media/ltx/s8.jpg" muted loop playsinline preload="none"></video><span class="tag" style="top:0.000%">Dense</span><span class="tag tag-ours" style="top:50.000%">PoCoAttn</span></div><figcaption><details><summary><span class="preview">INT. OLD BALLET REHEARSAL HALL - LATE AFTERNOON</span><span class="toggle"><span class="more">Show full prompt</span><span class="less">Collapse prompt</span></span></summary><p class="prompt-full">INT. OLD BALLET REHEARSAL HALL - LATE AFTERNOON. Tall windows pour low sunlight across a worn wooden floor, dust floating in the beams. A young dancer in a grey leotard and a loose knit cardigan rises onto pointe and turns slowly, her reflection following in a long mirror. The camera begins in a wide shot and pushes in to an 85mm portrait as she finishes the turn facing the window, light crossing her face, breath visible for a moment in the cool air. She steadies herself with a hand on the barre and looks down with a quiet exhale. Natural warm backlight, soft lens haze, visible fabric texture, clean subject-background separation, no text, no logos, no audience. Audio: creaking floorboards, soft breathing, a distant piano.</p></details></figcaption></figure>
+        <figure class="clip"><div class="stack stack-2"><video src="media/ltx/s1.mp4" poster="media/ltx/s1.jpg" muted loop playsinline preload="none"></video><span class="tag" style="top:0.000%">Dense</span><span class="tag tag-ours" style="top:50.000%">PoCoAttn</span></div><figcaption><details><summary><span class="preview">EXT. DERELICT ORBITAL STATION - EARTH TERMINATOR LINE</span><span class="toggle"><span class="more">Show full prompt</span><span class="less">Collapse prompt</span></span></summary><p class="prompt-full">EXT. DERELICT ORBITAL STATION - EARTH TERMINATOR LINE. A slow cinematic drift along the scarred hull of an abandoned space station, half of it in hard sunlight, half in shadow. An astronaut in a worn, patched EVA suit pulls herself hand over hand along a railing, Earth&#x27;s blue curve and city lights reflected in her gold visor. Loose cables and frozen droplets tumble past the lens in zero gravity. As she reaches a sealed hatch, a strip of red emergency lights flickers on inside the window and brightens her face through the visor. The camera makes a slow push-in to a tight 85mm portrait of her eyes. Photoreal, tactile suit fabric, hard rim light from the sun, deep black space, no text, no logos, no lens flare overload. Audio: suit breathing, muffled metal contact, faint radio static.</p></details></figcaption></figure>
+        <figure class="clip"><div class="stack stack-2"><video src="media/ltx/s4.mp4" poster="media/ltx/s4.jpg" muted loop playsinline preload="none"></video><span class="tag" style="top:0.000%">Dense</span><span class="tag tag-ours" style="top:50.000%">PoCoAttn</span></div><figcaption><details><summary><span class="preview">INT. STARSHIP BRIDGE - APPROACH TO A NEBULA</span><span class="toggle"><span class="more">Show full prompt</span><span class="less">Collapse prompt</span></span></summary><p class="prompt-full">INT. STARSHIP BRIDGE - APPROACH TO A NEBULA. An 85mm portrait of a middle-aged captain with a grey beard and a dark high-collared uniform, seated in a command chair. His face is lit from below by a floating holographic star chart, cyan lines tracing orbits across his cheek and eyes. He leans forward, the hologram rotates, and the main viewport behind him fills slowly with the pink and teal folds of a vast nebula, its glow spreading across the bridge consoles and warming his face. He narrows his eyes and gives a small decisive nod. The camera holds steady with a slow push-in. Photoreal skin, soft volumetric light, blurred crew silhouettes in the background, no text, no subtitles, no lens flare clusters. Audio: low engine drone, soft console chimes, a quiet exhale.</p></details></figcaption></figure>
+        <figure class="clip"><div class="stack stack-2"><video src="media/ltx/s7.mp4" poster="media/ltx/s7.jpg" muted loop playsinline preload="none"></video><span class="tag" style="top:0.000%">Dense</span><span class="tag tag-ours" style="top:50.000%">PoCoAttn</span></div><figcaption><details><summary><span class="preview">EXT. MOUNTAIN SWITCHBACK ROAD - RAINY EVENING</span><span class="toggle"><span class="more">Show full prompt</span><span class="less">Collapse prompt</span></span></summary><p class="prompt-full">EXT. MOUNTAIN SWITCHBACK ROAD - RAINY EVENING. A low tracking shot follows a dark green vintage 1960s sports car climbing a wet asphalt road through pine forest, headlights carving through drizzle and thin mist. Rain beads on the polished hood and streams off the chrome; the tires throw up fine spray. The camera moves alongside, then swings to a three-quarter front view as the car sweeps through a bend and its headlights wash over the lens. Low grey clouds hang between the ridges, and a distant valley town glows faintly below. Realistic, wet reflections, cinematic motion, muted cool palette with warm headlights, no text, no logos, no cartoon styling. Audio: tires on wet road, rain on metal, a steady engine note.</p></details></figcaption></figure>
+      </div>
+    </div>
+    <div class="model" id="wan_t2v">
+      <div class="model-head">
+        <div><h3>Wan2.1-T2V-14B</h3><p>720p text-to-video</p></div>
+        <p class="speed"><b>1.59×</b><span>DiT speedup<small>15% attention density</small></span></p>
+      </div>
+      <div class="clips">
+        <figure class="clip"><div class="stack stack-2"><video src="media/wan_t2v/338.mp4" poster="media/wan_t2v/338.jpg" muted loop playsinline preload="none"></video><span class="tag" style="top:0.000%">Dense</span><span class="tag tag-ours" style="top:50.000%">PoCoAttn</span></div><figcaption><details><summary><span class="preview">Close-up shot captures the steam gently rising from a coffee cup.</span><span class="toggle"><span class="more">Show full prompt</span><span class="less">Collapse prompt</span></span></summary><p class="prompt-full">A close-up shot captures the gentle rise of steam from a freshly brewed coffee cup. The camera slowly pans upwards, starting from the swirling steam, revealing the rich brown liquid inside the ceramic cup. The warm glow from the coffee creates a soft, inviting ambiance. The background is subtly blurred, focusing attention on the intricate dance of the steam as it dissipates into the air. Warm lighting enhances the cozy atmosphere of the scene.</p></details></figcaption></figure>
+        <figure class="clip"><div class="stack stack-2"><video src="media/wan_t2v/244.mp4" poster="media/wan_t2v/244.jpg" muted loop playsinline preload="none"></video><span class="tag" style="top:0.000%">Dense</span><span class="tag tag-ours" style="top:50.000%">PoCoAttn</span></div><figcaption><details><summary><span class="preview">On a frigid winter night, a homeless person is huddled in a street corner, trembling from the cold. His clothing is worn and insufficient. The camera is positioned at the knee level of a passerby, shooting horizontally.</span><span class="toggle"><span class="more">Show full prompt</span><span class="less">Collapse prompt</span></span></summary><p class="prompt-full">In a frigid winter night scene, a homeless person, dressed in tattered and thin clothing, is huddled and shivering on a street corner. The person’s face shows signs of fatigue and discomfort. The camera is positioned at knee level from the perspective of a passing pedestrian, capturing the scene horizontally. The background includes dimly lit street lamps and the silhouette of other buildings, emphasizing the isolation and harshness of the environment. The focus remains on the homeless individual as they struggle to stay warm. Knee-level horizontal shot.</p></details></figcaption></figure>
+        <figure class="clip"><div class="stack stack-2"><video src="media/wan_t2v/142.mp4" poster="media/wan_t2v/142.jpg" muted loop playsinline preload="none"></video><span class="tag" style="top:0.000%">Dense</span><span class="tag tag-ours" style="top:50.000%">PoCoAttn</span></div><figcaption><details><summary><span class="preview">A man in a suit slowly ties his tie,present in the style of the movie &quot;The Godfather&quot;.</span><span class="toggle"><span class="more">Show full prompt</span><span class="less">Collapse prompt</span></span></summary><p class="prompt-full">In the classic style of &quot;The Godfather,&quot; a well-dressed man in a tailored dark suit and slicked-back hair slowly and meticulously ties his tie in front of a luxurious wooden desk. The room is dimly lit with warm amber lighting casting shadows across the walls. He stands with confidence, his posture straight and authoritative. His face is serious, reflecting the power and complexity of his character. The background shows elegant furnishings and rich tapestries, adding to the opulent atmosphere. Medium shot focusing on the man from the chest up, capturing the subtle motions of tying the tie and the intensity in his gaze.</p></details></figcaption></figure>
+      </div>
+    </div>
+    <div class="model" id="wan_i2v">
+      <div class="model-head">
+        <div><h3>Wan2.1-I2V-14B</h3><p>720p image-to-video</p></div>
+        <p class="speed"><b>1.60×</b><span>DiT speedup<small>15% attention density</small></span></p>
+      </div>
+      <div class="clips">
+        <figure class="clip"><div class="stack stack-3"><video src="media/wan_i2v/12.mp4" poster="media/wan_i2v/12.jpg" muted loop playsinline preload="none"></video><span class="tag tag-src" style="top:0">Input image</span><span class="tag" style="top:33.333%">Dense</span><span class="tag tag-ours" style="top:66.667%">PoCoAttn</span></div><figcaption><details><summary><span class="preview">an aerial view of a busy city with a bridge in the background</span><span class="toggle"><span class="more">Show full prompt</span><span class="less">Collapse prompt</span></span></summary><p class="prompt-full">An aerial view captures a bustling cityscape at dusk, with a prominent suspension bridge stretching across a river in the background. The city skyline is filled with tall buildings, their lights beginning to twinkle as the day transitions into night. Below, a busy highway is filled with cars, their headlights creating streaks of light as they move along the road. The water reflects the warm hues of the sunset, adding a serene contrast to the urban activity below. The sky is painted with soft pinks and oranges, signaling the end of the day. A wide-angle shot from a high vantage point.</p></details></figcaption></figure>
+        <figure class="clip"><div class="stack stack-3"><video src="media/wan_i2v/135.mp4" poster="media/wan_i2v/135.jpg" muted loop playsinline preload="none"></video><span class="tag tag-src" style="top:0">Input image</span><span class="tag" style="top:33.333%">Dense</span><span class="tag tag-ours" style="top:66.667%">PoCoAttn</span></div><figcaption><details><summary><span class="preview">a bird with a fish in its beak flying over a field</span><span class="toggle"><span class="more">Show full prompt</span><span class="less">Collapse prompt</span></span></summary><p class="prompt-full">A majestic heron gracefully soars over a lush green field, its wings spread wide as it carries a small fish in its beak. The bird&#x27;s sleek feathers are a mix of gray and white, with black accents on its wings and tail. Its long legs trail behind, and its sharp talons are visible. The field below is dotted with vibrant green plants and yellow flowers, creating a serene backdrop. The sky above is a soft blue, adding to the tranquil atmosphere. A dynamic side view captures the bird mid-flight, emphasizing its powerful and elegant motion.</p></details></figcaption></figure>
+        <figure class="clip"><div class="stack stack-3"><video src="media/wan_i2v/287.mp4" poster="media/wan_i2v/287.jpg" muted loop playsinline preload="none"></video><span class="tag tag-src" style="top:0">Input image</span><span class="tag" style="top:33.333%">Dense</span><span class="tag tag-ours" style="top:66.667%">PoCoAttn</span></div><figcaption><details><summary><span class="preview">two men in white clothing standing next to each other</span><span class="toggle"><span class="more">Show full prompt</span><span class="less">Collapse prompt</span></span></summary><p class="prompt-full">A black-and-white photograph captures two men in traditional white clothing standing side by side against a textured wall. The man on the left, wearing a white robe and a turban, appears to be engaged in conversation with the man on the right, who is dressed in a long white robe with a hood. Both men have serious expressions, suggesting a moment of deep discussion. The lighting creates dramatic shadows, adding depth to the scene. The background is minimalistic, emphasizing the interaction between the two figures. A medium shot with a slight angle from the front.</p></details></figcaption></figure>
+      </div>
+    </div>
+    <div class="model" id="hunyuan">
+      <div class="model-head">
+        <div><h3>HunyuanVideo-13B</h3><p>720p text-to-video</p></div>
+        <p class="speed"><b>1.79×</b><span>DiT speedup<small>15% attention density</small></span></p>
+      </div>
+      <div class="clips">
+        <figure class="clip"><div class="stack stack-2"><video src="media/hunyuan/288.mp4" poster="media/hunyuan/288.jpg" muted loop playsinline preload="none"></video><span class="tag" style="top:0.000%">Dense</span><span class="tag tag-ours" style="top:50.000%">PoCoAttn</span></div><figcaption><details><summary><span class="preview">In the center of the room, there is a bed, above which hangs a ceiling fan that is rotating.</span><span class="toggle"><span class="more">Show full prompt</span><span class="less">Collapse prompt</span></span></summary><p class="prompt-full">A cozy bedroom with a single bed positioned at the center of the room. Above the bed, a ceiling fan rotates slowly, its blades catching the light and casting gentle shadows on the walls. The bed is neatly made with a comforter and pillows arranged symmetrically. Soft ambient lighting from a nearby lamp creates a warm and inviting atmosphere. The camera captures a medium shot, focusing on the bed and the rotating ceiling fan.</p></details></figcaption></figure>
+        <figure class="clip"><div class="stack stack-2"><video src="media/hunyuan/362.mp4" poster="media/hunyuan/362.jpg" muted loop playsinline preload="none"></video><span class="tag" style="top:0.000%">Dense</span><span class="tag tag-ours" style="top:50.000%">PoCoAttn</span></div><figcaption><details><summary><span class="preview">In the rain, there is a telephone booth, with rainwater sliding down the edges, forming curtains of water. As the camera zooms out, it reveals the telephone booth standing alone in a street soaked by the rain.</span><span class="toggle"><span class="more">Show full prompt</span><span class="less">Collapse prompt</span></span></summary><p class="prompt-full">In a rain-soaked city street, a vintage telephone booth stands alone. Rainwater slides down the glass sides, creating curtains of water that shimmer in the dim light. As the camera slowly zooms out from a close-up of the water droplets, the booth&#x27;s weathered exterior comes into focus. The camera continues to pull back, revealing the wet cobblestone street and puddles reflecting the overcast sky. The scene is enveloped in a soft, melancholic ambiance, with the rain continuing to fall steadily. Medium to wide shot, starting from a close-up of the water droplets and gradually pulling back to reveal the entire street.</p></details></figcaption></figure>
+        <figure class="clip"><div class="stack stack-2"><video src="media/hunyuan/310.mp4" poster="media/hunyuan/310.jpg" muted loop playsinline preload="none"></video><span class="tag" style="top:0.000%">Dense</span><span class="tag tag-ours" style="top:50.000%">PoCoAttn</span></div><figcaption><details><summary><span class="preview">Inside the cabin, passengers lean back in their seats, resting with closed eyes. As the camera pushes closer to the windows, it switches to the departure hall where crowds are surging and passengers are rushing about.</span><span class="toggle"><span class="more">Show full prompt</span><span class="less">Collapse prompt</span></span></summary><p class="prompt-full">In the cozy interior of an airplane cabin, passengers are leaning back in their seats, their eyes gently closed as they rest. Soft ambient lighting bathes the scene, highlighting the serene expressions on their faces. As the camera gradually zooms in towards the window, it captures the reflection of the passengers before smoothly transitioning to the bustling departure hall outside. Here, the scene is filled with energetic movement; crowds surge forward, passengers rush about, and luggage carts weave through the throng. The camera maintains a dynamic perspective, capturing the lively energy and chaos of the busy airport environment. Wide shots transition to close-ups, emphasizing the hustle and bustle of travelers.</p></details></figcaption></figure>
+      </div>
+    </div>
+    <div class="model" id="bernini">
+      <div class="model-head">
+        <div><h3>Bernini</h3><p>720p video editing</p></div>
+        <p class="speed"><b>1.72×</b><span>DiT speedup<small>15% attention density</small></span></p>
+      </div>
+      <div class="clips">
+        <figure class="clip"><div class="stack stack-3"><video src="media/bernini/4.mp4" poster="media/bernini/4.jpg" muted loop playsinline preload="none"></video><span class="tag tag-src" style="top:0">Source video</span><span class="tag" style="top:33.333%">Dense</span><span class="tag tag-ours" style="top:66.667%">PoCoAttn</span></div><figcaption><p class="prompt"><span class="kind">add object</span>Add a realistic white button-up shirt on the man in the video. The shirt should fit naturally to his body shape and posture, with visible fabric folds, seams, and slight movement that reacts to his motion. Use a soft, breathable cotton texture with subtle shading and highlights to reflect the scene&#x27;s lighting.</p></figcaption></figure>
+        <figure class="clip"><div class="stack stack-3"><video src="media/bernini/80.mp4" poster="media/bernini/80.jpg" muted loop playsinline preload="none"></video><span class="tag tag-src" style="top:0">Source video</span><span class="tag" style="top:33.333%">Dense</span><span class="tag tag-ours" style="top:66.667%">PoCoAttn</span></div><figcaption><p class="prompt"><span class="kind">change background</span>Transport the scene by changing the background to a serene beach at sunrise, complete with gentle ocean waves, golden sand, and palm trees swaying lightly in the breeze, infusing the video with a warm, tranquil glow that interacts softly with the subject.</p></figcaption></figure>
+        <figure class="clip"><div class="stack stack-3"><video src="media/bernini/123.mp4" poster="media/bernini/123.jpg" muted loop playsinline preload="none"></video><span class="tag tag-src" style="top:0">Source video</span><span class="tag" style="top:33.333%">Dense</span><span class="tag tag-ours" style="top:66.667%">PoCoAttn</span></div><figcaption><p class="prompt"><span class="kind">add effect</span>Adding swirling golden light trails and magical glowing fireflies drifting around the cat.</p></figcaption></figure>
+      </div>
+    </div>
+    <p class="gallery-note">DiT speedup is measured over the FlashAttention-3 dense baseline at 15% attention density.</p>
+  </div>
+</section>
+
+<section class="cite" id="cite">
+  <div class="wrap">
+    <p class="eyebrow">Citation</p>
+    <h2>BibTeX</h2>
+    <div class="bibtex">
+      <div class="bibtex-bar"><span>PoCoAttn</span><button type="button" id="copy-bibtex">Copy</button></div>
+      <pre id="bibtex">@article{wu2026pocoattn,
+  title   = {PoCoAttn: Position--Content Collaborative Sparse Attention
+             for Fast and High-Fidelity Video Generation},
+  author  = {Wu, Jianwen and Wang, Meiling and Zhou, Junkang and Shen, Yipeng and You, Haoran},
+  year    = {2026},
+  note    = {Under review}
+}</pre>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="foot">
+  <div class="wrap"><span><b><a href="https://ecoai-group.github.io/" target="_blank" rel="noopener">EcoAI Lab</a></b> · Purdue University</span><a href="#top">Back to top ↑</a></div>
+</footer>
+
+<script>
+(function(){
+  // Play each clip only while it is on screen.
+  var vids=document.querySelectorAll('.stack video, .reel-card video');
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){
+      var v=e.target;
+      if(e.isIntersecting){var p=v.play(); if(p&&p.catch) p.catch(function(){});} else v.pause();
+    });},{threshold:.2});
+    vids.forEach(function(v){io.observe(v);});
+  } else vids.forEach(function(v){v.setAttribute('controls','');});
+  // Speed-fidelity chart: one tooltip, shown on hover and on keyboard focus.
+  var fig=document.getElementById('pareto'), tip=document.getElementById('pareto-tip');
+  if(fig&&tip){
+    var parts=tip.children;
+    var show=function(g){
+      parts[0].textContent=g.dataset.v; parts[1].textContent=g.dataset.n; parts[2].textContent=g.dataset.d;
+      var r=g.getBoundingClientRect(), f=fig.getBoundingClientRect();
+      tip.hidden=false;
+      var x=r.left+r.width/2-f.left, half=tip.offsetWidth/2;
+      tip.style.left=Math.max(half+4,Math.min(f.width-half-4,x))+'px';
+      tip.style.top=(r.top+r.height/2-f.top)+'px';
+    };
+    fig.querySelectorAll('.pt').forEach(function(g){
+      g.addEventListener('pointerenter',function(){show(g);});
+      g.addEventListener('focus',function(){show(g);});
+      g.addEventListener('pointerleave',function(){tip.hidden=true;});
+      g.addEventListener('blur',function(){tip.hidden=true;});
+    });
+  }
+  var btn=document.getElementById('copy-bibtex'), pre=document.getElementById('bibtex');
+  btn.addEventListener('click',function(){
+    function done(t){btn.textContent=t; setTimeout(function(){btn.textContent='Copy';},1600);}
+    function fallback(){var r=document.createRange(); r.selectNodeContents(pre); var s=getSelection(); s.removeAllRanges(); s.addRange(r); done('Selected');}
+    try{navigator.clipboard.writeText(pre.textContent).then(function(){done('Copied');},fallback);}catch(e){fallback();}
+  });
+})();
+</script>
+</body>
+</html>
