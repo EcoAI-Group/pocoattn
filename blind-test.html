@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>PoCoAttn Blind Test</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Libre+Franklin:wght@400;600;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+/* Layout: the project page's black gallery look, one question per screen. Top bar: title, question numbers, restart.
+   Below: two wipe sliders stacked (Dense | A, Dense | B on one clock) beside a panel with the pick, the feedback and the reveal. */
+:root{
+  color-scheme:dark;
+  --black:#000000; --coal:#0b0a08; --panel:#17150f; --hair:rgba(255,255,255,.16);
+  --gold:#cfb991; --aged:#8e6f3e; --rush:#daaa00; --white:#ffffff;
+  --dim:rgba(255,255,255,.62); --faint:rgba(255,255,255,.45);
+  --yes:#4cc38a; --no:#ef6a5f; --nv:#76b900;
+  --display:"Barlow Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --sans:"Libre Franklin","Helvetica Neue",Helvetica,Arial,sans-serif;
+  --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --vw:min(520px, calc((100dvh - 210px) / 2 * 16 / 9));
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{min-height:100%}
+body{margin:0;background:var(--coal);color:var(--white);font-family:var(--sans);font-size:16px;line-height:1.5}
+:focus-visible{outline:2px solid var(--rush);outline-offset:3px}
+button{font:inherit;color:inherit}
+.app{max-width:1320px;margin:0 auto;padding-block:20px 28px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+@media (min-width:900px){.app{padding-left:max(40px,env(safe-area-inset-left,0px));padding-right:max(40px,env(safe-area-inset-right,0px))}}
+.eyebrow a{color:inherit;text-decoration:none}
+.eyebrow a:hover{color:var(--white)}
+.eyebrow{margin:0;color:var(--gold);font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+
+/* top bar */
+.bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px 28px;padding-bottom:16px;margin-bottom:22px;border-bottom:1px solid var(--hair)}
+.bar .sub{margin:8px 0 0;color:var(--dim);font-size:15px}
+.bar .sub b{color:var(--white);font-weight:600}
+.bar .sub .ours{color:var(--gold)}
+.bar .sub .nv{color:var(--nv)}
+.lead{display:flex;align-items:center;gap:22px;min-width:0}
+.back-btn{flex:none;display:inline-flex;align-items:center;gap:10px;min-height:52px;padding:0 22px;background:var(--gold);color:var(--black);font-size:15px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;text-decoration:none;box-shadow:0 4px 14px rgba(207,185,145,.25)}
+.back-btn span{font-size:20px;line-height:1}
+.back-btn:hover{background:var(--white)}
+@media (max-width:640px){.lead{flex-direction:column;align-items:flex-start;gap:12px}.back-btn{min-height:44px}}
+.bar h1{margin:2px 0 0;font-family:var(--display);font-weight:700;font-size:clamp(28px,3vw,38px);line-height:1;letter-spacing:.01em;text-transform:uppercase}
+.steps{display:flex;flex-wrap:wrap;gap:6px}
+.step{position:relative;width:40px;height:40px;border:1px solid rgba(255,255,255,.28);background:transparent;font-family:var(--display);font-size:20px;font-weight:700;cursor:pointer;color:rgba(255,255,255,.82)}
+.step:hover{border-color:var(--gold);color:var(--gold)}
+.step.cur{border-color:var(--gold);background:var(--gold);color:var(--black)}
+.step .mk{position:absolute;right:-6px;top:-7px;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font:800 11px/1 var(--sans);color:var(--black)}
+.step.ok .mk{background:var(--yes)}
+.step.bad .mk{background:var(--no)}
+.step.score{width:auto;padding:0 12px;font-size:16px;letter-spacing:.04em;text-transform:uppercase}
+.restart{min-height:40px;padding:0 18px;border:1px solid var(--gold);background:transparent;color:var(--gold);font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+.restart:hover{background:rgba(207,185,145,.18)}
+
+/* question */
+.quiz{display:grid;grid-template-columns:var(--vw) minmax(260px,380px);justify-content:center;align-items:start;gap:24px clamp(28px,4vw,56px)}
+.stages{display:flex;flex-direction:column;gap:10px;width:var(--vw);max-width:100%}
+.cmp{position:relative;aspect-ratio:16/9;max-width:100%;overflow:hidden;background:var(--panel);touch-action:pan-y;cursor:ew-resize;user-select:none;-webkit-user-select:none}
+.cmp video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none}
+.cmp .v-dense{clip-path:inset(0 calc(100% - var(--x)) 0 0);z-index:1}
+.tag{position:absolute;top:0;left:0;z-index:2;padding:6px 10px;background:rgba(0,0,0,.78);color:var(--white);font-size:10px;font-weight:800;letter-spacing:.08em;line-height:1;text-transform:uppercase}
+.tag-right{left:auto;right:0}
+.tag-ours{background:var(--gold);color:var(--black)}
+.cmp-line{position:absolute;top:0;bottom:0;left:var(--x);z-index:3;width:2px;margin-left:-1px;background:var(--gold);box-shadow:0 0 6px rgba(0,0,0,.45);outline:none}
+.cmp-knob{position:absolute;top:50%;left:50%;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;background:var(--gold);box-shadow:0 2px 10px rgba(0,0,0,.55)}
+.cmp-knob::before,.cmp-knob::after{content:"";position:absolute;top:50%;margin-top:-5px;border:5px solid transparent}
+.cmp-knob::before{left:3px;border-right:6px solid var(--black)}
+.cmp-knob::after{right:3px;border-left:6px solid var(--black)}
+.cmp-line:focus-visible .cmp-knob{outline:2px solid var(--rush);outline-offset:3px}
+
+.panel{display:flex;flex-direction:column;gap:16px;min-width:0}
+.panel h2{margin:4px 0 0;font-family:var(--serif);font-weight:400;font-size:20px;line-height:1.35;color:var(--white);text-wrap:balance}
+.hint{margin:0;color:var(--dim);font-size:14px;line-height:1.6}
+.dense-chip{display:inline-block;padding:1px 7px;background:var(--white);color:var(--black);font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;line-height:1.5;vertical-align:1px}
+.bar h1 em{font-style:normal;color:var(--gold);text-decoration:underline;text-decoration-thickness:3px;text-underline-offset:5px}
+.picks{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pick{position:relative;min-height:64px;border:1px solid var(--gold);background:transparent;color:var(--gold);font-family:var(--display);font-size:34px;font-weight:700;cursor:pointer}
+.pick:hover{background:rgba(207,185,145,.18)}
+.pick[disabled]{cursor:default}
+.pick[disabled]:not(.chosen){border-color:var(--hair);color:var(--faint);background:transparent}
+.pick.chosen.right{background:var(--yes);border-color:var(--yes);color:var(--black)}
+.pick.chosen.wrong{background:var(--no);border-color:var(--no);color:var(--black)}
+
+.feedback{display:flex;align-items:center;gap:14px;padding:14px 16px;border:1px solid}
+.feedback.right{border-color:var(--yes);background:rgba(76,195,138,.12)}
+.feedback.wrong{border-color:var(--no);background:rgba(239,106,95,.12)}
+.feedback .big{flex:none;width:52px;height:52px;border-radius:50%;display:grid;place-items:center;font:800 30px/1 var(--sans);color:var(--black)}
+.feedback.right .big{background:var(--yes)}
+.feedback.wrong .big{background:var(--no)}
+.feedback b{display:block;font-family:var(--display);font-size:28px;font-weight:700;line-height:1;text-transform:uppercase}
+.feedback.right b{color:var(--yes)}
+.feedback.wrong b{color:var(--no)}
+.feedback span{color:var(--dim);font-size:13px}
+
+.res{display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:2px 14px;padding:10px 0;border-top:1px solid var(--hair)}
+.res .who{font-size:12px;font-weight:800;letter-spacing:.07em;text-transform:uppercase}
+.res .who small{display:block;margin-top:3px;color:var(--faint);font-size:11px;font-weight:400;letter-spacing:.02em;text-transform:none}
+.res .num{font-family:var(--display);font-weight:700;font-size:38px;line-height:.9;font-variant-numeric:tabular-nums;text-align:right}
+.res.ours .who,.res.ours .num{color:var(--gold)}
+
+.ctl{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.ctl button{min-height:28px;padding:0 11px;border:1px solid rgba(255,255,255,.28);background:transparent;color:rgba(255,255,255,.82);font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+.ctl button:hover{border-color:var(--gold);color:var(--gold)}
+.ctl button.on{background:var(--gold);border-color:var(--gold);color:var(--black)}
+.ctl .grp{display:inline-flex}
+.ctl .grp button+button{border-left:0}
+.next{min-height:46px;border:0;background:var(--gold);color:var(--black);font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+.next:hover{background:var(--white)}
+.foot{margin:18px 0 0;color:var(--faint);font-size:11.5px;text-align:center}
+
+/* score screen */
+.final{max-width:640px;margin:20px auto 0;display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center}
+.final .big{font-family:var(--display);font-weight:700;font-size:clamp(56px,9vw,96px);line-height:.9;color:var(--gold)}
+.final .big small{display:block;margin-top:8px;color:var(--white);font-size:22px;letter-spacing:.04em;text-transform:uppercase}
+.final ol{list-style:none;margin:0;padding:0;width:100%;display:flex;flex-direction:column}
+.final li{display:grid;grid-template-columns:28px 1fr auto;gap:12px;align-items:center;padding:9px 0;border-top:1px solid var(--hair);text-align:left;font-size:14px}
+.final li .m{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font:800 12px/1 var(--sans);color:var(--black)}
+.final li .m.ok{background:var(--yes)}.final li .m.bad{background:var(--no)}.final li .m.none{background:rgba(255,255,255,.2)}
+.final li small{color:var(--faint);font-size:12px}
+.final p{margin:0;color:var(--dim);font-size:13.5px;max-width:56ch}
+@media (max-width:900px){.quiz{grid-template-columns:minmax(0,1fr)}.stages{width:100%;max-width:520px;margin:0 auto}:root{--vw:100%}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="bar">
+    <div class="lead">
+      <a class="back-btn" href="./" id="back"><span aria-hidden="true">←</span>Back</a>
+      <div>
+      <p class="eyebrow">PoCoAttn · Blind test</p>
+      <h1>Which is <em>closer</em> to Dense?</h1>
+      <p class="sub">A and B: one is <b class="ours">PoCoAttn (Ours)</b>, one is the SOTA <b>Sol-Attn</b> by <b class="nv">NVIDIA</b>.</p>
+    </div>
+    </div>
+    <nav class="steps" id="steps" aria-label="Questions"></nav>
+    <button type="button" class="restart" id="restart">Restart</button>
+  </header>
+
+  <main id="quiz" class="quiz">
+    <div class="stages" id="stages"></div>
+    <aside class="panel">
+      <div>
+        <p class="eyebrow" id="q-model"></p>
+        <h2 id="q-prompt"></h2>
+      </div>
+      <p class="hint">Pick the one you think is closer to <span class="dense-chip">Dense</span> on the left of each divider.</p>
+      <div class="picks">
+        <button type="button" class="pick" id="pick-a">A</button>
+        <button type="button" class="pick" id="pick-b">B</button>
+      </div>
+      <div class="feedback" id="feedback" hidden></div>
+      <div id="results" hidden></div>
+      <button type="button" class="next" id="next" hidden>Next</button>
+      <div class="ctl">
+        <button type="button" id="play">Pause</button>
+        <span class="grp" role="group" aria-label="Speed" id="speeds"></span>
+      </div>
+    </aside>
+  </main>
+
+  <section class="final" id="final" hidden>
+    <div class="big" id="final-score"></div>
+    <ol id="final-list"></ol>
+    <p>In the public version the votes of all visitors are pooled here.</p>
+    <button type="button" class="next" id="final-restart" style="padding:0 28px">Play again</button>
+  </section>
+
+  <p class="foot">Speedup = DiT time vs FA3 dense on one H100. PSNR vs Dense: higher means closer to Dense.</p>
+</div>
+
+<script>
+const MODELS = {
+  t2v: {name: "Wan2.1-T2V-14B · 720p", ours: {d: "25.0%", s: "1.40×"}, sol: {d: "24.7%", s: "1.37×"}},
+  i2v: {name: "Wan2.1-I2V-14B · 720p", ours: {d: "25.0%", s: "1.39×"}, sol: {d: "33.5%", s: "1.32×"}},
+  hy:  {name: "HunyuanVideo-13B · 720p", ours: {d: "25.1%", s: "1.51×"}, sol: {d: "32.6%", s: "1.44×"}},
+};
+const NAME = {ours: "PoCoAttn", sol: "Sol-Attn"};
+const QS = [
+  {key: "hy101",  model: "hy",  prompt: "A splash of coffee arcs into the word “Energy”.", psnr: {ours: 34.84, sol: 24.62}},
+  {key: "i2v114", model: "i2v", prompt: "A dog runs across the grass with a soccer ball.", psnr: {ours: 23.39, sol: 18.47}},
+  {key: "i2v135", model: "i2v", prompt: "A heron flies over a green field with a fish.",  psnr: {ours: 30.76, sol: 19.26}},
+  {key: "195",    model: "t2v", prompt: "Teenagers play basketball on a rooftop.",        psnr: {ours: 22.70, sol: 18.49}},
+  {key: "hy444",  model: "hy",  prompt: "A spaceship rises into an aurora-lit night sky.", psnr: {ours: 38.75, sol: 29.85}},
+  {key: "227",    model: "t2v", prompt: "A boy does his homework at a lamp-lit desk.",    psnr: {ours: 34.04, sol: 24.36}},
+];
+const src = (k, m) => `media/blindtest/${k}_${m}.mp4`;
+const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = (id) => document.getElementById(id);
+let cur = 0, x = 50, rate = 1, answers = [], orders = [];
+
+function el(tag, attrs = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") e.className = v; else if (k === "text") e.textContent = v; else e.setAttribute(k, v);
+  }
+  for (const k of kids) if (k) e.append(k);
+  return e;
+}
+
+// two sliders, built once and reused for every question
+const sliders = ["A", "B"].map((letter) => {
+  const dense = el("video", {class: "v-dense", muted: "", loop: "", playsinline: "", preload: "auto"});
+  const cand = el("video", {class: "v-cand", muted: "", loop: "", playsinline: "", preload: "auto"});
+  dense.muted = cand.muted = true;
+  const tagR = el("span", {class: "tag tag-right", text: letter});
+  const line = el("div", {class: "cmp-line", role: "slider", tabindex: "0", id: `divider-${letter}`,
+    "aria-label": `Divider: Dense on the left, ${letter} on the right`, "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": "50"},
+    el("span", {class: "cmp-knob"}));
+  const box = el("div", {class: "cmp", style: "--x:50%"}, cand, dense, el("span", {class: "tag", text: "Dense"}), tagR, line);
+  let drag = false;
+  const at = (ev) => { const b = box.getBoundingClientRect(); setX((ev.clientX - b.left) / b.width * 100); };
+  box.addEventListener("pointerdown", (ev) => { drag = true; box.setPointerCapture(ev.pointerId); at(ev); });
+  box.addEventListener("pointermove", (ev) => { if (drag) at(ev); });
+  box.addEventListener("pointerup", () => { drag = false; });
+  box.addEventListener("pointercancel", () => { drag = false; });
+  line.addEventListener("keydown", (ev) => {
+    const step = ev.shiftKey ? 10 : 2;
+    const to = {ArrowLeft: x - step, ArrowRight: x + step, Home: 0, End: 100}[ev.key];
+    if (to !== undefined) { setX(to); ev.preventDefault(); }
+  });
+  $("stages").append(box);
+  return {letter, box, line, dense, cand, tagR};
+});
+const vids = sliders.flatMap(s => [s.cand, s.dense]);
+const master = sliders[0].cand;
+
+function setX(p) {
+  x = Math.max(0, Math.min(100, p));
+  for (const s of sliders) { s.box.style.setProperty("--x", x + "%"); s.line.setAttribute("aria-valuenow", String(Math.round(x))); }
+}
+
+// controls
+$("play").addEventListener("click", () => { if (master.paused) vids.forEach(v => v.play().catch(() => {})); else vids.forEach(v => v.pause()); });
+master.addEventListener("play", () => { $("play").textContent = "Pause"; });
+master.addEventListener("pause", () => { $("play").textContent = "Play"; });
+for (const v of [1, 0.5, 0.25]) {
+  const b = el("button", {type: "button", id: `speed-${v}`, class: v === 1 ? "on" : "", text: v + "×"});
+  b.addEventListener("click", () => { rate = v; vids.forEach(x_ => { x_.playbackRate = v; }); $("speeds").querySelectorAll("button").forEach(x_ => x_.classList.toggle("on", x_ === b)); });
+  $("speeds").append(b);
+}
+$("pick-a").addEventListener("click", () => pick(0));
+$("pick-b").addEventListener("click", () => pick(1));
+$("next").addEventListener("click", () => go(cur + 1));
+$("restart").addEventListener("click", restart);
+$("final-restart").addEventListener("click", restart);
+
+function renderSteps() {
+  const nav = $("steps");
+  nav.innerHTML = "";
+  QS.forEach((q, i) => {
+    const a = answers[i];
+    const b = el("button", {type: "button", id: `step-${i + 1}`, "aria-label": `Question ${i + 1}`,
+      class: "step" + (i === cur ? " cur" : "") + (a ? (a === "ours" ? " ok" : " bad") : ""), text: String(i + 1)});
+    if (a) b.append(el("span", {class: "mk", "aria-hidden": "true", text: a === "ours" ? "✓" : "✗"}));
+    b.addEventListener("click", () => go(i));
+    nav.append(b);
+  });
+  const done = answers.filter(Boolean).length;
+  const sc = el("button", {type: "button", id: "step-score", class: "step score" + (cur === QS.length ? " cur" : ""), text: `Score ${done}/${QS.length}`});
+  sc.addEventListener("click", () => go(QS.length));
+  nav.append(sc);
+}
+
+function load(q, order) {
+  const t = 0;
+  sliders.forEach((s, i) => { s.dense.src = src(q.key, "dense"); s.cand.src = src(q.key, order[i]); });
+  let ready = 0;
+  vids.forEach(v => v.addEventListener("loadeddata", () => {
+    if (++ready < vids.length) return;
+    vids.forEach(v_ => { v_.currentTime = t; v_.playbackRate = rate; if (!reduceMotion) v_.play().catch(() => {}); });
+  }, {once: true}));
+}
+
+function go(i) {
+  cur = Math.max(0, Math.min(QS.length, i));
+  renderSteps();
+  const onFinal = cur === QS.length;
+  $("quiz").hidden = onFinal;
+  $("final").hidden = !onFinal;
+  if (onFinal) { vids.forEach(v => v.pause()); renderFinal(); return; }
+  const q = QS[cur], order = orders[cur], m = MODELS[q.model];
+  $("q-model").textContent = `${cur + 1} / ${QS.length} · ${m.name}`;
+  $("q-prompt").textContent = q.prompt;
+  setX(50);
+  load(q, order);
+  showAnswer();
+}
+
+function showAnswer() {
+  const q = QS[cur], order = orders[cur], a = answers[cur], m = MODELS[q.model];
+  const picks = [$("pick-a"), $("pick-b")];
+  picks.forEach((b, i) => {
+    b.disabled = !!a;
+    b.className = "pick" + (a && order[i] === a ? " chosen " + (a === "ours" ? "right" : "wrong") : "");
+    const letter = ["A", "B"][i];
+    b.textContent = a && order[i] === a ? `${letter} ${a === "ours" ? "✓" : "✗"}` : letter;
+  });
+  sliders.forEach((s, i) => {
+    s.tagR.className = "tag tag-right" + (a && order[i] === "ours" ? " tag-ours" : "");
+    s.tagR.textContent = a ? `${s.letter} · ${NAME[order[i]]}` : s.letter;
+  });
+  const fb = $("feedback"), res = $("results");
+  fb.innerHTML = ""; res.innerHTML = "";
+  fb.hidden = res.hidden = $("next").hidden = !a;
+  if (!a) return;
+  const ourLetter = order[0] === "ours" ? "A" : "B";
+  fb.className = "feedback " + (a === "ours" ? "right" : "wrong");
+  fb.append(el("div", {class: "big", text: a === "ours" ? "✓" : "✗"}),
+    el("div", {}, el("b", {text: a === "ours" ? "Ours" : "Sol-Attn"}),
+      el("span", {text: a === "ours" ? `${ourLetter} is PoCoAttn.` : `PoCoAttn was ${ourLetter}.`})));
+  for (const k of order) {
+    const letter = order[0] === k ? "A" : "B";
+    res.append(el("div", {class: "res" + (k === "ours" ? " ours" : "")},
+      el("div", {class: "who"}, document.createTextNode(`${letter} · ${NAME[k]}${k === "ours" ? " (Ours)" : ""}`),
+        el("small", {text: `${m[k].d} attention · ${q.psnr[k].toFixed(2)} dB PSNR`})),
+      el("div", {class: "num", text: m[k].s})));
+  }
+  $("next").textContent = cur === QS.length - 1 ? "See score" : "Next";
+}
+
+function pick(i) {
+  if (answers[cur]) return;
+  answers[cur] = orders[cur][i];
+  renderSteps();
+  showAnswer();
+}
+
+function renderFinal() {
+  const n = answers.filter(a => a === "ours").length, done = answers.filter(Boolean).length;
+  $("final-score").innerHTML = "";
+  $("final-score").append(document.createTextNode(`${n} / ${QS.length}`),
+    el("small", {text: done < QS.length ? `found ours · ${QS.length - done} unanswered` : "times you found ours"}));
+  const list = $("final-list");
+  list.innerHTML = "";
+  QS.forEach((q, i) => {
+    const a = answers[i];
+    const li = el("li", {},
+      el("span", {class: "m " + (a ? (a === "ours" ? "ok" : "bad") : "none"), text: a ? (a === "ours" ? "✓" : "✗") : "·"}),
+      el("span", {}, document.createTextNode(q.prompt + " "), el("small", {text: MODELS[q.model].name})),
+      el("small", {text: `${q.psnr.ours.toFixed(1)} vs ${q.psnr.sol.toFixed(1)} dB`}));
+    li.style.cursor = "pointer";
+    li.addEventListener("click", () => go(i));
+    list.append(li);
+  });
+}
+
+function restart() {
+  answers = QS.map(() => null);
+  orders = QS.map(() => (Math.random() < 0.5 ? ["ours", "sol"] : ["sol", "ours"]));
+  go(0);
+}
+
+function tick() {                            // all four clips follow the first one's clock
+  if (!master.paused) {
+    const t0 = master.currentTime;
+    for (const v of vids) {
+      if (v === master || v.readyState < 2) continue;
+      const d = t0 - v.currentTime;          // nudge the rate; seek only when far off (a seek stalls decoding)
+      if (Math.abs(d) > 0.3) { v.currentTime = t0; v.playbackRate = rate; }
+      else if (Math.abs(d) > 0.03) v.playbackRate = rate * (d > 0 ? 1.08 : 0.92);
+      else if (v.playbackRate !== rate) v.playbackRate = rate;
+      if (v.paused) v.play().catch(() => {});
+    }
+  }
+  requestAnimationFrame(tick);
+}
+
+restart();
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
